@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-
+import React, { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import {
   Typography,
   TextField,
@@ -279,6 +279,9 @@ const LinaerStepper = () => {
   });
   const [activeStep, setActiveStep] = useState(0);
   const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const loaderRef = useRef(null);
 
   const [skippedSteps, setSkippedSteps] = useState([]);
   const steps = getSteps();
@@ -299,7 +302,6 @@ const LinaerStepper = () => {
         .then((data) => data.json())
         .then((res) => {
           console.log("res", res);
-          setPosts(res);
           setActiveStep(activeStep + 1);
         });
     } else {
@@ -322,16 +324,41 @@ const LinaerStepper = () => {
   };
 
 
-  // useEffect(() => {
-  //   fetch('https://jsonplaceholder.typicode.com/posts')
-  //     .then(response => {
-  //       console.log(response);
-  //       setPosts(response);
-  //     })
-  //     .catch(error => {
-  //       console.log(error);
-  //     });
-  // }, []);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) {
+          setPage(prevPage => prevPage + 1);
+        }
+      },
+      {
+        root: null,
+        rootMargin: '0px',
+        threshold: 1.0,
+      }
+    );
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current);
+    }
+    return () => {
+      if (loaderRef.current) {
+        observer.unobserve(loaderRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get(`https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`)
+      .then(response => {
+        setPosts(prevPosts => [...prevPosts, ...response.data]);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.log(error);
+      });
+  }, [page]);
+
   console.log('posts', posts);
 
   return (
@@ -361,19 +388,11 @@ const LinaerStepper = () => {
           );
         })}
       </Stepper>
-      <div className="container bg-danger">
-        {posts?.map((post) => (
-          <div className="d-flex" key={post.id}>
-           <small>{post.name}</small> 
-           <small>{post.email}</small> 
-          </div>
-        ))
-        }
-      </div>
+
 
       {activeStep === steps.length ? (
         <Typography variant="h3" align="center">
-          Thank You 😎
+          Thank You
         </Typography>
       ) : (
         <>
@@ -409,8 +428,21 @@ const LinaerStepper = () => {
               </Button>
             </form>
           </FormProvider>
-
-
+          <div className="container mt-5 bg-danger">
+            {posts?.map((post) => (
+              <div className="card" key={post.id}>
+                <div className="card-body">
+                  <small className="text-info">
+                    {post.title}
+                  </small>
+                  <small className="text-success">{post.body}</small>
+                </div>
+              </div>
+            ))
+            }
+            {loading && <p>Loading...</p>}
+            <div ref={loaderRef}></div>
+          </div>
         </>
       )}
     </div>
